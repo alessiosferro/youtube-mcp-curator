@@ -2,6 +2,7 @@
   "name": "social-curator-ai",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Safety-focused local adaptation of an existing YouTube Data API MCP server.",
   "type": "module",
   "engines": {

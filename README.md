@@ -54,3 +54,7 @@ Il server ascolta solo su `127.0.0.1`; il token Google viene cifrato in `.data/g
 ## Stato della V0.1
 
 La V0.1 è pensata per un solo utente sul computer locale. Per pubblicare un plugin installabile da altri utenti serviranno un endpoint HTTPS stabile, autenticazione MCP OAuth 2.1 multiutente, gestione isolata dei token, informative e verifiche di Google e OpenAI. La guida descrive questi passaggi; non contiene credenziali o URL di produzione.
+
+## Licenza
+
+Il codice originale di Social Curator AI è distribuito con licenza MIT; i componenti di terze parti restano soggetti ai rispettivi avvisi in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
