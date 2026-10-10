@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { pathToFileURL } from "node:url";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import {
   acceptedContent,
@@ -279,9 +280,6 @@ async function main() {
     throw new Error("La V0.1 personale deve rimanere associata a 127.0.0.1.");
   }
   const service = new YouTubeService(await createYouTubePort());
-  const mcpServer = createMcpServer(service);
-  const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  await mcpServer.connect(transport);
 
   const httpServer = createServer(async (request, response) => {
     if (!isLoopbackHost(request.headers.host, port)) {
@@ -304,10 +302,17 @@ async function main() {
       return;
     }
     if (path === MCP_PATH && ["GET", "POST", "DELETE"].includes(request.method ?? "")) {
+      const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      const mcpServer = createMcpServer(service);
       try {
+        await mcpServer.connect(transport);
         await transport.handleRequest(request, response);
-      } catch {
+      } catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : "errore non specificato";
+        console.error(`Richiesta MCP non riuscita: ${detail}`);
         if (!response.headersSent) response.writeHead(500).end("Errore interno MCP.");
+      } finally {
+        await mcpServer.close().catch(() => undefined);
       }
       return;
     }
@@ -320,17 +325,17 @@ async function main() {
   });
 
   const stop = () => {
-    httpServer.close(() => {
-      void transport.close();
-      void mcpServer.close();
-      process.exit(0);
-    });
+    httpServer.close(() => process.exit(0));
   };
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
 }
 
-main().catch(() => {
-  console.error("Avvio non riuscito. Controlla .env, completa npm run auth e verifica che la porta locale sia libera.");
-  process.exitCode = 1;
-});
+const executedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+if (import.meta.url === executedPath) {
+  main().catch((error: unknown) => {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : "errore non specificato";
+    console.error(`Avvio non riuscito (${detail}). Controlla .env, completa npm run auth e verifica che la porta locale sia libera.`);
+    process.exitCode = 1;
+  });
+}
