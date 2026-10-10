@@ -2,7 +2,7 @@
 
 La V0.1 adotta come base tecnica il progetto [prmichaelsen/youtube-mcp](https://github.com/prmichaelsen/youtube-mcp), release `1.1.1`, verificata al commit `f0175a41dbdf252e39e110de1c4ca133f9beb1b6` il 10 ottobre 2026. Il progetto upstream dichiara licenza MIT.
 
-Dal progetto upstream abbiamo preso il modello di client tipizzato per YouTube Data API, la ricerca per tipo di risorsa e le chiamate `subscriptions.list`, `subscriptions.insert` e `subscriptions.delete`. La nostra applicazione registra solo `list_subscriptions`, `search_channels`, `subscribe` e `unsubscribe`.
+Dal progetto upstream abbiamo preso il modello di client tipizzato per YouTube Data API, la ricerca per tipo di risorsa e le chiamate `subscriptions.list`, `subscriptions.insert` e `subscriptions.delete`. La nostra applicazione registra `list_subscriptions`, `search_channels`, `prepare_subscribe`, `subscribe`, `prepare_unsubscribe` e `unsubscribe`.
 
 ## Modifiche di sicurezza per l'uso personale
 

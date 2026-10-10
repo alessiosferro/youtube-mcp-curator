@@ -19,7 +19,7 @@ La V0.1 offre due percorsi. MCP Inspector è il test diretto più semplice e non
 
 4. Nell’interfaccia seleziona **Streamable HTTP**, inserisci `http://127.0.0.1:8787/mcp` e connettiti.
 5. Prova `list_subscriptions` e `search_channels`.
-6. Prova `subscribe` con un ID canale trovato dalla ricerca e `unsubscribe` con un `subscriptionId` restituito da `list_subscriptions`. Il server deve chiedere conferma nell’interfaccia MCP; se la richiesta viene rifiutata o annullata, l’API YouTube non riceve la modifica.
+6. Per testare una scrittura, chiama prima `prepare_subscribe` o `prepare_unsubscribe`. Questi strumenti mostrano l’oggetto e restituiscono un token temporaneo senza modificare YouTube. Dopo aver mostrato il canale e aver ricevuto una conferma esplicita dell’utente, chiama `subscribe` o `unsubscribe` con lo stesso ID, il token e `confirmed: true`.
 
 Gli ID canale YouTube iniziano con `UC`. Il tool `unsubscribe` richiede l’ID dell’iscrizione, non l’ID del canale.
 
@@ -42,7 +42,7 @@ La chiave OpenAI serve solo al client del tunnel. Il server YouTube non chiama l
 4. Configura il client per inoltrare a `http://127.0.0.1:8787/mcp`, con il tuo `tunnel_id` e runtime API key. Tieni il client in esecuzione durante il test.
 5. In ChatGPT apri **Plugins**, aggiungi un server MCP personalizzato e scegli **Tunnel** come connessione. Seleziona il tunnel associato e crea l’app personale.
 6. Installa l’app nel workspace, avvia una nuova chat Work e selezionala con `@`.
-7. Prova richieste di lettura e una singola modifica. Per ogni iscrizione o disiscrizione deve comparire la conferma esplicita del server MCP. Verifica che annullare la conferma non cambi l’account.
+7. Dopo aver cambiato nomi, schemi o annotazioni dei tool, aggiorna/ricarica la connessione del server MCP in ChatGPT. Poi prova letture e una singola modifica. L’assistente deve mostrare il canale, attendere un messaggio separato di conferma e solo allora invocare il tool di scrittura; ChatGPT può inoltre chiedere la propria approvazione per `unsubscribe`. Se non arriva conferma, non chiamare il tool di scrittura.
 
 La disponibilità di plugin personali, developer mode e tunnel dipende dalle autorizzazioni del workspace e dell’organizzazione Platform. OpenAI documenta l’Inspector e il tunnel come percorsi di test distinti. Il tunnel è adatto al test privato, ma non è accettato come endpoint per la pubblicazione pubblica.
 

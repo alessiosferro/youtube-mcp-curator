@@ -6,7 +6,8 @@
 - I token Google sono cifrati con AES-256-GCM e una chiave generata localmente. Il file è creato con permessi restrittivi e si trova in `.data/`.
 - Le credenziali OAuth e la chiave di cifratura sono in `.env`, escluso da Git.
 - Il server non registra token, refresh token o risposte integrali di YouTube nei log.
-- I tool di modifica avviano un’elicitation MCP con il nome e l’ID dell’oggetto; il codice procede solo dopo una risposta accettata con `confirmed: true`. Annullare o rifiutare non esegue la chiamata di scrittura.
+- La conferma usa due chiamate MCP compatibili con client che non supportano l’elicitation: `prepare_subscribe`/`prepare_unsubscribe` restituiscono solo l’anteprima e un token HMAC firmato, legato a tipo e ID dell’azione, valido cinque minuti. I tool di scrittura richiedono quel token e `confirmed: true`; la conferma è monouso e un token non valido, scaduto, riutilizzato o associato a un ID diverso non esegue la scrittura.
+- `unsubscribe` dichiara `destructiveHint: true`, così ChatGPT può chiedere la propria approvazione oltre al gate del server. `subscribe` è un’aggiunta reversibile, quindi dichiara `destructiveHint: false`, ma richiede comunque un messaggio di conferma separato prima della chiamata di scrittura.
 - `subscribe` e `unsubscribe` operano su un solo canale per chiamata. L’iscrizione viene ricontrollata prima della rimozione.
 
 La modalità personale presuppone che il computer locale sia sotto il controllo dell’utente. Non esporre la porta 8787 su una rete pubblica. Per più utenti o per un server remoto servono autenticazione MCP, separazione dei token per utente, secret management e procedure di revoca.

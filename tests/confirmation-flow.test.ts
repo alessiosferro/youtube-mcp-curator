@@ -23,25 +23,24 @@ function makePort(): YouTubePort & {
   };
 }
 
-async function connectClient(confirm: "accept" | "decline") {
-  const port = makePort();
-  const server = createMcpServer(new YouTubeService(port), new Uint8Array(randomBytes(32)));
-  const client = new Client(
-    { name: "social-curator-test", version: "0.1.0" },
-    { capabilities: { elicitation: {} } }
-  );
+async function connectClient(port = makePort(), key = new Uint8Array(randomBytes(32))) {
+  const server = createMcpServer(new YouTubeService(port), key);
+  // Deliberately do not advertise or handle MCP elicitation: ChatGPT connections
+  // can complete the preview/confirmation round trip using ordinary tool calls.
+  const client = new Client({ name: "social-curator-test", version: "0.1.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
-  client.setRequestHandler("elicitation/create", async (request) => {
-    expect(request.params.message).toContain("Science channel");
-    return confirm === "accept"
-      ? { action: "accept", content: { confirmed: true } }
-      : { action: "decline" };
-  });
   return { port, server, client };
 }
 
-describe("MCP write confirmation", () => {
+function readConfirmationToken(result: { structuredContent?: unknown }): string {
+  const content = result.structuredContent as { status?: string; confirmationToken?: string } | undefined;
+  expect(content?.status).toBe("confirmation_required");
+  expect(content?.confirmationToken).toEqual(expect.any(String));
+  return content!.confirmationToken!;
+}
+
+describe("ChatGPT-compatible write confirmation", () => {
   const openConnections: Array<{ server: ReturnType<typeof createMcpServer>; client: Client }> = [];
 
   afterEach(async () => {
@@ -50,12 +49,16 @@ describe("MCP write confirmation", () => {
     }));
   });
 
-  it("subscribes only after the MCP confirmation is accepted", async () => {
-    const connected = await connectClient("accept");
+  it("subscribes only after the user confirms a prepared channel", async () => {
+    const connected = await connectClient();
     openConnections.push(connected);
+    const preview = await connected.client.callTool({ name: "prepare_subscribe", arguments: { channelId } });
+    const token = readConfirmationToken(preview);
+
+    expect(connected.port.insertSubscription).not.toHaveBeenCalled();
     const result = await connected.client.callTool({
       name: "subscribe",
-      arguments: { channelId }
+      arguments: { channelId, confirmationToken: token, confirmed: true }
     });
 
     expect(connected.port.insertSubscription).toHaveBeenCalledExactlyOnceWith(channelId);
@@ -65,34 +68,41 @@ describe("MCP write confirmation", () => {
     }));
   });
 
-  it("does not subscribe after the user declines", async () => {
-    const connected = await connectClient("decline");
+  it("does not subscribe when the user has not confirmed after the preview", async () => {
+    const connected = await connectClient();
     openConnections.push(connected);
-    await connected.client.callTool({
-      name: "subscribe",
-      arguments: { channelId }
-    });
+    await connected.client.callTool({ name: "prepare_subscribe", arguments: { channelId } });
 
     expect(connected.port.insertSubscription).not.toHaveBeenCalled();
   });
 
-  it("does not unsubscribe after the user declines", async () => {
-    const connected = await connectClient("decline");
+  it("does not unsubscribe when the user has not confirmed after the preview", async () => {
+    const connected = await connectClient();
     openConnections.push(connected);
-    await connected.client.callTool({
-      name: "unsubscribe",
-      arguments: { subscriptionId: "sub-1" }
-    });
+    await connected.client.callTool({ name: "prepare_unsubscribe", arguments: { subscriptionId: "sub-1" } });
 
     expect(connected.port.deleteSubscription).not.toHaveBeenCalled();
   });
 
-  it("unsubscribes only after the MCP confirmation is accepted", async () => {
-    const connected = await connectClient("accept");
+  it("marks only the actual unsubscribe tool as destructive for ChatGPT approval", async () => {
+    const connected = await connectClient();
     openConnections.push(connected);
+    const { tools } = await connected.client.listTools();
+
+    expect(tools.find((tool) => tool.name === "prepare_unsubscribe")?.annotations?.destructiveHint).toBe(false);
+    expect(tools.find((tool) => tool.name === "unsubscribe")?.annotations?.destructiveHint).toBe(true);
+  });
+
+  it("unsubscribes only the prepared subscription after confirmation", async () => {
+    const connected = await connectClient();
+    openConnections.push(connected);
+    const preview = await connected.client.callTool({ name: "prepare_unsubscribe", arguments: { subscriptionId: "sub-1" } });
+    const token = readConfirmationToken(preview);
+    expect(connected.port.deleteSubscription).not.toHaveBeenCalled();
+
     const result = await connected.client.callTool({
       name: "unsubscribe",
-      arguments: { subscriptionId: "sub-1" }
+      arguments: { subscriptionId: "sub-1", confirmationToken: token, confirmed: true }
     });
 
     expect(connected.port.deleteSubscription).toHaveBeenCalledExactlyOnceWith("sub-1");
@@ -100,5 +110,57 @@ describe("MCP write confirmation", () => {
       type: "text",
       text: expect.stringContaining("Disiscrizione completata")
     }));
+  });
+
+  it("accepts a prepared confirmation across stateless MCP server instances in the same process", async () => {
+    const port = makePort();
+    const key = new Uint8Array(randomBytes(32));
+    const previewConnection = await connectClient(port, key);
+    const confirmConnection = await connectClient(port, key);
+    openConnections.push(previewConnection, confirmConnection);
+    const preview = await previewConnection.client.callTool({
+      name: "prepare_unsubscribe",
+      arguments: { subscriptionId: "sub-1" }
+    });
+    const token = readConfirmationToken(preview);
+
+    const result = await confirmConnection.client.callTool({
+      name: "unsubscribe",
+      arguments: { subscriptionId: "sub-1", confirmationToken: token, confirmed: true }
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(port.deleteSubscription).toHaveBeenCalledExactlyOnceWith("sub-1");
+  });
+
+  it("rejects a confirmation token for a different subscription", async () => {
+    const connected = await connectClient();
+    openConnections.push(connected);
+    const preview = await connected.client.callTool({ name: "prepare_unsubscribe", arguments: { subscriptionId: "sub-1" } });
+    const token = readConfirmationToken(preview);
+    const result = await connected.client.callTool({
+      name: "unsubscribe",
+      arguments: { subscriptionId: "sub-2", confirmationToken: token, confirmed: true }
+    });
+
+    expect(result.isError).toBe(true);
+    expect(connected.port.deleteSubscription).not.toHaveBeenCalled();
+  });
+
+  it("rejects replay of a consumed confirmation token", async () => {
+    const connected = await connectClient();
+    openConnections.push(connected);
+    const preview = await connected.client.callTool({ name: "prepare_unsubscribe", arguments: { subscriptionId: "sub-1" } });
+    const token = readConfirmationToken(preview);
+    const request = {
+      name: "unsubscribe",
+      arguments: { subscriptionId: "sub-1", confirmationToken: token, confirmed: true }
+    };
+
+    await connected.client.callTool(request);
+    const replay = await connected.client.callTool(request);
+
+    expect(replay.isError).toBe(true);
+    expect(connected.port.deleteSubscription).toHaveBeenCalledExactlyOnceWith("sub-1");
   });
 });

@@ -6,8 +6,8 @@ Server MCP personale per consultare e gestire le iscrizioni YouTube da ChatGPT. 
 
 - `list_subscriptions`: legge una pagina delle iscrizioni dell’account collegato.
 - `search_channels`: cerca canali pubblici su YouTube.
-- `subscribe`: mostra il canale selezionato e richiede una conferma MCP esplicita prima dell’iscrizione.
-- `unsubscribe`: mostra l’iscrizione selezionata e richiede una conferma MCP esplicita prima della rimozione.
+- `prepare_subscribe` e `prepare_unsubscribe`: mostrano l’oggetto esatto e producono un token di conferma temporaneo senza modificare l’account.
+- `subscribe` e `unsubscribe`: eseguono una sola modifica solo con il token corretto e `confirmed: true`; il token scade dopo cinque minuti ed è monouso. La disiscrizione è contrassegnata come azione distruttiva per l’approvazione nativa dell’host ChatGPT.
 
 L’agente può usare i risultati per proporre canali, ma la V0.1 non implementa un motore autonomo di raccomandazione. Le modifiche riguardano un solo canale per chiamata.
 

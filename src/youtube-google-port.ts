@@ -90,15 +90,31 @@ export async function createYouTubePort(): Promise<YouTubePort> {
     },
 
     async getSubscription(subscriptionId) {
+      // `id` and `mine` are mutually exclusive filters in subscriptions.list.
+      // Resolve the ID first, then verify that it belongs to the authenticated
+      // account with `mine` + `forChannelId` before allowing an unsubscribe.
       const response = await youtube.execute((api) =>
         api.subscriptions.list({
           part: ["snippet", "contentDetails"],
           id: [subscriptionId],
-          mine: true,
           maxResults: 1
         })
       );
-      return response.data.items?.[0] ?? null;
+      const candidate = response.data.items?.[0];
+      const channelId = candidate?.snippet?.resourceId?.channelId;
+      if (!candidate?.id || !channelId) return null;
+
+      const ownSubscriptions = await youtube.execute((api) =>
+        api.subscriptions.list({
+          part: ["snippet"],
+          mine: true,
+          forChannelId: channelId,
+          maxResults: 50
+        })
+      );
+      return apiItems(ownSubscriptions.data.items).some((item) => item.id === subscriptionId)
+        ? candidate
+        : null;
     },
 
     async deleteSubscription(subscriptionId) {
@@ -121,13 +137,27 @@ export function getGoogleApiFailureMessage(error: unknown): string {
   if (reason === "quotaExceeded" || reason === "dailyLimitExceeded" || reason === "rateLimitExceeded") {
     return "Quota YouTube esaurita o limite temporaneo raggiunto. Controlla la pagina Quotas del progetto Google Cloud.";
   }
+  if (reason === "incompatibleParameters") {
+    return "Richiesta YouTube non valida: due filtri non possono essere usati insieme. Nessuna modifica è stata applicata.";
+  }
+  if (reason === "insufficientPermissions") {
+    return "Il collegamento Google non dispone dei permessi YouTube necessari. Ripeti npm run auth e accetta le autorizzazioni richieste.";
+  }
   if (reason === "subscriptionDuplicate") return "Sei già iscritto a questo canale.";
+  if (reason === "subscriptionNotFound") return "Iscrizione non trovata: potrebbe essere già stata rimossa.";
+  if (reason === "subscriptionForbidden") {
+    return "YouTube ha rifiutato la disiscrizione: il collegamento non è autorizzato per questa iscrizione. Ripeti npm run auth e verifica l'account collegato.";
+  }
   if (reason === "publisherNotFound" || status === 404) return "Canale o iscrizione non trovati.";
   if (status === 401) return "Autorizzazione Google scaduta o revocata. Ripeti npm run auth.";
   if (status === 403) {
     return "Google ha rifiutato la richiesta. Controlla che YouTube Data API v3 sia attiva, il consenso OAuth e i limiti sulle iscrizioni.";
   }
-  return "La richiesta a YouTube non è riuscita. Riprova e controlla la configurazione Google Cloud.";
+  const details = [
+    typeof status === "number" ? `HTTP ${status}` : undefined,
+    reason ? `motivo ${reason}` : undefined
+  ].filter(Boolean);
+  return `La richiesta a YouTube non è riuscita${details.length ? ` (${details.join(", ")})` : ""}. Nessuna modifica è stata applicata.`;
 }
 
 export function isYouTubeApiError(error: unknown): boolean {
