@@ -1,0 +1,32 @@
+{
+  "name": "social-curator-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal local MCP server for managing YouTube subscriptions.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "auth": "tsx src/auth.ts",
+    "generate-key": "tsx src/generate-key.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "inspect": "npx @modelcontextprotocol/inspector@latest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "dotenv": "^16.4.7",
+    "googleapis": "^160.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^6.0.0",
+    "vitest": "^5.0.3"
+  }
+}
