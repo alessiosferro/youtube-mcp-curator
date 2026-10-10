@@ -2,7 +2,7 @@
   "name": "social-curator-ai",
   "version": "0.1.0",
   "private": true,
-  "description": "Personal local MCP server for managing YouTube subscriptions.",
+  "description": "Safety-focused local adaptation of an existing YouTube Data API MCP server.",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -19,7 +19,7 @@
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "dotenv": "^16.4.7",
-    "googleapis": "^160.0.0",
+    "googleapis": "^171.4.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {

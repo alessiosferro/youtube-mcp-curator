@@ -1,7 +1,7 @@
-import { google } from "googleapis";
 import { createGoogleOAuthClient } from "./google-oauth.js";
 import { loadTokens, saveTokens } from "./token-store.js";
 import type { YouTubePort } from "./youtube-service.js";
+import { YouTubeClient } from "./youtube-client.js";
 
 function apiItems<T>(value: T[] | null | undefined): T[] {
   return value ?? [];
@@ -24,15 +24,17 @@ export async function createYouTubePort(): Promise<YouTubePort> {
       .catch(() => console.error("Impossibile aggiornare il token cifrato. Ripeti il collegamento Google se il problema continua."));
   });
 
-  const youtube = google.youtube({ version: "v3", auth: oauth });
+  const youtube = new YouTubeClient(() => oauth);
   return {
     async listSubscriptions(args) {
-      const response = await youtube.subscriptions.list({
-        part: ["snippet", "contentDetails"],
-        mine: true,
-        maxResults: args.maxResults,
-        ...(args.pageToken ? { pageToken: args.pageToken } : {})
-      });
+      const response = await youtube.execute((api) =>
+        api.subscriptions.list({
+          part: ["snippet", "contentDetails"],
+          mine: true,
+          maxResults: args.maxResults,
+          ...(args.pageToken ? { pageToken: args.pageToken } : {})
+        })
+      );
       return {
         items: apiItems(response.data.items),
         ...(response.data.nextPageToken ? { nextPageToken: response.data.nextPageToken } : {})
@@ -40,13 +42,15 @@ export async function createYouTubePort(): Promise<YouTubePort> {
     },
 
     async searchChannels(args) {
-      const response = await youtube.search.list({
-        part: ["snippet"],
-        q: args.query,
-        type: ["channel"],
-        maxResults: args.maxResults,
-        ...(args.pageToken ? { pageToken: args.pageToken } : {})
-      });
+      const response = await youtube.execute((api) =>
+        api.search.list({
+          part: ["snippet"],
+          q: args.query,
+          type: ["channel"],
+          maxResults: args.maxResults,
+          ...(args.pageToken ? { pageToken: args.pageToken } : {})
+        })
+      );
       return {
         items: apiItems(response.data.items)
           .map((item) => ({ id: item.id?.channelId, snippet: item.snippet }))
@@ -56,41 +60,52 @@ export async function createYouTubePort(): Promise<YouTubePort> {
     },
 
     async getChannel(channelId) {
-      const response = await youtube.channels.list({
-        part: ["snippet"],
-        id: [channelId],
-        maxResults: 1
-      });
+      const response = await youtube.execute((api) =>
+        api.channels.list({
+          part: ["snippet"],
+          id: [channelId],
+          maxResults: 1
+        })
+      );
       return response.data.items?.[0] ?? null;
     },
 
     async insertSubscription(channelId) {
-      const response = await youtube.subscriptions.insert({
-        part: ["snippet"],
-        requestBody: {
-          snippet: {
-            resourceId: {
-              kind: "youtube#channel",
-              channelId
+      const response = await youtube.execute(
+        (api) =>
+          api.subscriptions.insert({
+            part: ["snippet"],
+            requestBody: {
+              snippet: {
+                resourceId: {
+                  kind: "youtube#channel",
+                  channelId
+                }
+              }
             }
-          }
-        }
-      });
+          }),
+        { retrySafe: false }
+      );
       return { subscriptionId: response.data.id ?? null };
     },
 
     async getSubscription(subscriptionId) {
-      const response = await youtube.subscriptions.list({
-        part: ["snippet", "contentDetails"],
-        id: [subscriptionId],
-        mine: true,
-        maxResults: 1
-      });
+      const response = await youtube.execute((api) =>
+        api.subscriptions.list({
+          part: ["snippet", "contentDetails"],
+          id: [subscriptionId],
+          mine: true,
+          maxResults: 1
+        })
+      );
       return response.data.items?.[0] ?? null;
     },
 
     async deleteSubscription(subscriptionId) {
-      await youtube.subscriptions.delete({ id: subscriptionId });
+      await youtube.execute(
+        (api) => api.subscriptions.delete({ id: subscriptionId }),
+        { retrySafe: false }
+      );
     }
   };
 }

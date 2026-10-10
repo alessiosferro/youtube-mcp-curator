@@ -31,6 +31,8 @@ Non inserire password Google o credenziali OAuth in chat. Servono il Client ID, 
 
 Per la configurazione Google e il test in ChatGPT, consulta:
 
+- [Adozione del server upstream e modifiche di sicurezza](docs/UPSTREAM_ADOPTION.md)
+- [Note sulle licenze di terze parti](THIRD_PARTY_NOTICES.md)
 - [Google OAuth e YouTube Data API](docs/GOOGLE_SETUP.md)
 - [Test locale e collegamento a ChatGPT](docs/CHATGPT_SETUP.md)
 - [Sicurezza, scope e quote](docs/SECURITY_AND_QUOTAS.md)
